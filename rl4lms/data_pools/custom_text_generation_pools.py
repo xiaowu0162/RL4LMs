@@ -12,6 +12,53 @@ import zipfile
 import json
 
 
+class KP20k(TextGenPool):
+    @classmethod
+    def prepare(cls,
+                split: str,
+                prompt_suffix: str = "",
+                prompt_prefix: str = "",
+                truncate_article: int = None,
+                max_size: int = None):
+        
+        dataset_split = KP20k.gen_split_name(split)
+        data_files = {dataset_split: '/local1/diwu/DeepKPG/data/scikp/kp20k/json/{}.json'.format(dataset_split)}
+        dataset = load_dataset("json", data_files=data_files)
+
+        samples = []
+        for ix, item in tqdm(enumerate(dataset[dataset_split]),
+                             desc="Tokenizing dataset",
+                             total=len(dataset[dataset_split])):
+
+            if truncate_article is not None:
+                tokens = word_tokenize(item["src"])
+                tokens = tokens[:truncate_article]
+                item["src"] = " ".join(tokens)
+
+            sample = Sample(id=f"{split}_{ix}",
+                            prompt_or_input_text=prompt_prefix + item["src"] + prompt_suffix,
+                            references=[item["tgt"]]
+                            )
+            samples.append(sample)
+
+            if max_size is not None and ix == (max_size-1):
+                break
+
+        pool_instance = cls(samples)
+        return pool_instance
+
+    @staticmethod
+    def gen_split_name(split: str):
+        if split == "train":
+            split_name = "train"
+        elif split == "val":
+            split_name = "valid"
+        elif split == "test":
+            split_name = "test"
+        else:
+            raise NotImplementedError
+        return split_name
+
 class ToTTo(TextGenPool):
     @classmethod
     def prepare(cls, split: str,

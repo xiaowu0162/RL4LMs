@@ -6,16 +6,16 @@ tokenizer:
 
 reward_fn:
   # id: meteor
-  id: bert_score
-  # id: sem_kp_f1
-  # args:
-  #   model: "/local1/diwu/RL4LMs/base_kp_metric_models/train_simcse-kp20k_kptimes_openkp_stackex-nepoch1-seqlen32-lr3e-05-bsz128-2022-08-21_17-47-59/8103"
-
+  # id: bert_score
+  id: sem_kp_f1
+  args:
+    model: "/local1/diwu/RL4LMs/base_kp_metric_models/train_simcse-kp20k_kptimes_openkp_stackex-nepoch1-seqlen32-lr3e-05-bsz128-2022-08-21_17-47-59/8103"
+    similarity_threshold: 0.0
 datapool:
   id: kp20k
   args:
     prompt_prefix: "summarize: "
-    max_size: 20000
+    max_size: 100000
 
 env:
   n_envs: 3  # 10
@@ -32,7 +32,7 @@ alg:
     n_steps: 512
     batch_size: 16  # 64
     verbose: 1
-    learning_rate: 0.000002
+    learning_rate: 0.00001   # 0.000002
     n_epochs: 5
     ent_coef: 0.0
   kl_div:
@@ -63,6 +63,7 @@ train_evaluation:
     - id: sem_kp_f1
       args:
         model: "/local1/diwu/RL4LMs/base_kp_metric_models/train_simcse-kp20k_kptimes_openkp_stackex-nepoch1-seqlen32-lr3e-05-bsz128-2022-08-21_17-47-59/8103"
+        similarity_threshold: 0.0
     # - id: meteor
     #   args: {}
     # - id: rouge

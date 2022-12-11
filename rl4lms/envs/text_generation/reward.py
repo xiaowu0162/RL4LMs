@@ -267,19 +267,14 @@ class BERTScoreRewardFunction(RewardFunction):
             predicted = [next_observation.context_text]
             metric_results = self._metric.compute(None, predicted, references)
             bert_score = metric_results["semantic/bert_score"][1]
-            # print(references)
-            # print(predicted)
-            # print(metric_results)
-            # print(bert_score)
-            # exit()
             return bert_score
         return 0
 
 
 class SemKeyphraseF1RewardFunction(RewardFunction):
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, similarity_threshold: float) -> None:
         super().__init__()
-        self._metric = SemKeyphraseF1Metric(model)
+        self._metric = SemKeyphraseF1Metric(model, similarity_threshold)
 
     def __call__(
         self,
@@ -294,11 +289,6 @@ class SemKeyphraseF1RewardFunction(RewardFunction):
             predicted = [next_observation.context_text]
             metric_results = self._metric.compute(None, predicted, references)
             sem_kp_f1 = metric_results["semantic/sem_kp_f1"][1]
-            print(references)
-            print(predicted)
-            print(metric_results)
-            print(sem_kp_f1)
-            exit()
             return sem_kp_f1
         return 0
 

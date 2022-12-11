@@ -192,22 +192,23 @@ class BERTScoreMetric(BaseMetric):
 
 
 class SemKeyphraseF1Metric(BaseMetric):
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, similarity_threshold: float) -> None:
         super().__init__()
         # since models are loaded heavily on cuda:0, use the last one to avoid memory
         self._last_gpu = f"cuda:{torch.cuda.device_count() - 1}"
         
+        self.similarity_threshold = similarity_threshold
         self.phrase_sim_model = SentenceTransformer(model, device=self._last_gpu)
         print('Initialized model from', model)
         
         from nltk.stem.porter import PorterStemmer
         self.stemmer = PorterStemmer()
         
-    def compute_sem_f1_single_pair(self, pred_str, label_str, similarity_threshold = 0.4):
+    def compute_sem_f1_single_pair(self, pred_str, label_str):
         labels = list(set([x.strip() for x in label_str.lower().split(';')]))
         preds = list(set([x.strip() for x in pred_str.lower().split(';')]))
-        labels_stemmed = list([' '.join([self.stemmer.stem(x) for x in y.lower().split()]) for y in labels])
-        preds_stemmed = list([' '.join([self.stemmer.stem(x) for x in y.lower().split()]) for y in preds])
+        labels_stemmed = [' '.join([self.stemmer.stem(x) for x in y.lower().split()]) for y in labels]
+        preds_stemmed = [' '.join([self.stemmer.stem(x) for x in y.lower().split()]) for y in preds]
         n_labels, n_preds = len(labels), len(preds)
         
         # calculate embeddings
@@ -225,7 +226,7 @@ class SemKeyphraseF1Metric(BaseMetric):
                 cur_pred, cur_pred_stemmed = preds[pred_i], preds_stemmed[pred_i]
                 if cur_pred_stemmed in labels_stemmed:
                     cur_pred_score = 1
-                elif top_sim_values[pred_i][0] > similarity_threshold:
+                elif top_sim_values[pred_i][0] > self.similarity_threshold:
                     cur_pred_score = top_sim_values[pred_i][0].item()
                 else:
                     cur_pred_score = 0
@@ -240,7 +241,7 @@ class SemKeyphraseF1Metric(BaseMetric):
                 cur_label, cur_label_stemmed = labels[label_i], labels_stemmed[label_i]
                 if labels_stemmed in preds_stemmed:
                     cur_label_score = 1
-                elif top_sim_values[label_i][0] > similarity_threshold:
+                elif top_sim_values[label_i][0] > self.similarity_threshold:
                     cur_label_score = top_sim_values[label_i][0].item()
                 else:
                     cur_label_score = 0

@@ -1,5 +1,7 @@
-# data
+# data and checkpoints
 base_checkpoints/
+rl4lm_exps/
+base_kp_metric_models/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -5,6 +5,7 @@ from typing import List, Dict, Tuple, Any
 from abc import abstractmethod
 import numpy as np
 from datasets import load_metric
+from sentence_transformers import SentenceTransformer, util
 from gem_metrics.msttr import MSTTR
 from gem_metrics.ngrams import NGramStats
 from rl4lms.envs.text_generation.caption_metrics.cider import Cider
@@ -187,6 +188,97 @@ class BERTScoreMetric(BaseMetric):
             bert_scores = metric_results["f1"]
             corpus_level_score = np.mean(bert_scores)
             metric_dict = {"semantic/bert_score": (bert_scores, corpus_level_score)}
+            return metric_dict
+
+
+class SemKeyphraseF1Metric(BaseMetric):
+    def __init__(self, model: str) -> None:
+        super().__init__()
+        # since models are loaded heavily on cuda:0, use the last one to avoid memory
+        self._last_gpu = f"cuda:{torch.cuda.device_count() - 1}"
+        
+        self.phrase_sim_model = SentenceTransformer(model, device=self._last_gpu)
+        print('Initialized model from', model)
+        
+        from nltk.stem.porter import PorterStemmer
+        self.stemmer = PorterStemmer()
+        
+    def compute_sem_f1_single_pair(self, pred_str, label_str, similarity_threshold = 0.4):
+        labels = list(set([x.strip() for x in label_str.lower().split(';')]))
+        preds = list(set([x.strip() for x in pred_str.lower().split(';')]))
+        labels_stemmed = list([' '.join([self.stemmer.stem(x) for x in y.lower().split()]) for y in labels])
+        preds_stemmed = list([' '.join([self.stemmer.stem(x) for x in y.lower().split()]) for y in preds])
+        n_labels, n_preds = len(labels), len(preds)
+        
+        # calculate embeddings
+        input_tokens = labels + preds
+        phrase_embed_mean_pool = self.phrase_sim_model.encode(input_tokens, show_progress_bar=False)
+        label_embeds = phrase_embed_mean_pool[:n_labels]
+        pred_embeds = phrase_embed_mean_pool[n_labels:]
+        
+        if n_preds > 0 and n_labels > 0:
+            # semantic precision                                                                                                                                                                                    
+            cur_p_scores = []
+            all_cos_sim = util.cos_sim(pred_embeds, label_embeds)
+            top_sim_values, top_sim_indices = torch.topk(all_cos_sim, min(3, n_labels))
+            for pred_i in range(n_preds):
+                cur_pred, cur_pred_stemmed = preds[pred_i], preds_stemmed[pred_i]
+                if cur_pred_stemmed in labels_stemmed:
+                    cur_pred_score = 1
+                elif top_sim_values[pred_i][0] > similarity_threshold:
+                    cur_pred_score = top_sim_values[pred_i][0].item()
+                else:
+                    cur_pred_score = 0
+                cur_p_scores.append(cur_pred_score)
+            semantic_p = np.mean(cur_p_scores)
+
+            # semantic recall
+            cur_r_scores = []
+            all_cos_sim = util.cos_sim(label_embeds, pred_embeds)
+            top_sim_values, top_sim_indices = torch.topk(all_cos_sim, min(3, n_preds))
+            for label_i in range(n_labels):
+                cur_label, cur_label_stemmed = labels[label_i], labels_stemmed[label_i]
+                if labels_stemmed in preds_stemmed:
+                    cur_label_score = 1
+                elif top_sim_values[label_i][0] > similarity_threshold:
+                    cur_label_score = top_sim_values[label_i][0].item()
+                else:
+                    cur_label_score = 0
+                cur_r_scores.append(cur_label_score)
+            semantic_r = np.mean(cur_r_scores)
+        else:
+            semantic_p = semantic_r = 0.0
+
+        # semantic f1
+        semantic_f1 = float(2 * (semantic_p * semantic_r)) / (semantic_p + semantic_r) if semantic_p + semantic_r > 0 else 0.0
+        
+        return semantic_f1
+
+    def compute_metric(self, predictions, references, device):
+        assert len(predictions) == len(references)
+        results = []
+        for cur_pred, cur_refs in zip(predictions, references):
+            results.append([self.compute_sem_f1_single_pair(cur_pred, x) for x in cur_refs])
+        return results
+
+    def compute(
+        self,
+        prompt_texts: List[str],
+        generated_texts: List[str],
+        reference_texts: List[List[str]],
+        meta_infos: List[Dict[str, Any]] = None,
+        model: PreTrainedModel = None,
+        split_name: str = None,
+    ) -> Tuple[List[float], float]:
+        with torch.no_grad():
+            metric_results = self.compute_metric(
+                predictions=generated_texts,
+                references=reference_texts,
+                device=self._last_gpu,
+            )
+            sem_f1_scores = metric_results
+            corpus_level_score = np.mean(sem_f1_scores)
+            metric_dict = {"semantic/sem_kp_f1": (sem_f1_scores, corpus_level_score)}
             return metric_dict
 
 

@@ -22,6 +22,9 @@ class KP20k(TextGenPool):
                 max_size: int = None):
         
         dataset_split = KP20k.gen_split_name(split)
+        # if debug:
+        #     data_files = {dataset_split: '/local1/diwu/DeepKPG/data/scikp/kp20k/json/debug/{}.json'.format(dataset_split)}
+        # else:
         data_files = {dataset_split: '/local1/diwu/DeepKPG/data/scikp/kp20k/json/{}.json'.format(dataset_split)}
         dataset = load_dataset("json", data_files=data_files)
 

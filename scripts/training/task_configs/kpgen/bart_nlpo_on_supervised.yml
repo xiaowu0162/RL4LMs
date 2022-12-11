@@ -7,15 +7,12 @@ tokenizer:
 reward_fn:
   # id: meteor
   id: bert_score
-  # id: sem_kp_f1
-  # args:
-  #   model: "/local1/diwu/RL4LMs/base_kp_metric_models/train_simcse-kp20k_kptimes_openkp_stackex-nepoch1-seqlen32-lr3e-05-bsz128-2022-08-21_17-47-59/8103"
 
 datapool:
   id: kp20k
   args:
-    prompt_prefix: "summarize: "
-    max_size: 20000
+    prompt_prefix: ""
+    debug: true
 
 env:
   n_envs: 3  # 10
@@ -30,18 +27,19 @@ alg:
   id: nlpo
   args: 
     n_steps: 512
-    batch_size: 16  # 64
+    batch_size: 16   # 64
     verbose: 1
     learning_rate: 0.000002
     n_epochs: 5
     ent_coef: 0.0
+    verbose: 2
   kl_div:
     coeff: 0.01
     target_kl: 0.2
   policy:
     id: maskable_seq2seq_lm_actor_critic_policy
     args:
-      model_name: /local1/diwu/RL4LMs/base_checkpoints/20221203-2010_kptimes_checkpoints_t5-base_lr6e-5_polynomial_seed1234
+      model_name: /local1/diwu/RL4LMs/base_checkpoints/20220816-2212_kptimes_checkpoints_bart-base_digittokenfalse_device4,5,6,7_pergpubsz4x4_lr6e-5_polynomial_seed1234/checkpoint-36000
       apply_model_parallel: True
       prompt_truncation_side: "right"
       min_tokens_to_keep: 100
@@ -56,16 +54,13 @@ alg:
 
 train_evaluation:
   eval_batch_size: 100
-  n_iters: 100
+  n_iters: 50
   eval_every: 10
-  save_every: 1
+  save_every: 5
   metrics:
-    - id: sem_kp_f1
-      args:
-        model: "/local1/diwu/RL4LMs/base_kp_metric_models/train_simcse-kp20k_kptimes_openkp_stackex-nepoch1-seqlen32-lr3e-05-bsz128-2022-08-21_17-47-59/8103"
     # - id: meteor
     #   args: {}
-    # - id: rouge
+    - id: rouge
     # - id: bleu
     #   args: {}
     - id: bert_score
